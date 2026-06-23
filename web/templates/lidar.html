@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <title>Agrobot A1 - Radar LIDAR</title>
+
+    <style>
+        body {
+            margin: 0;
+            background: #05070a;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+
+        .top {
+            padding: 12px;
+            background: #101722;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .top h1 {
+            margin: 0;
+            font-size: 22px;
+        }
+
+        .wrap {
+            display: flex;
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .radar-box {
+            background: #081018;
+            border: 1px solid #1c3448;
+            border-radius: 14px;
+            padding: 15px;
+        }
+
+        canvas {
+            background: #020509;
+            border-radius: 50%;
+            border: 2px solid #14324a;
+        }
+
+        .panel {
+            width: 330px;
+            background: #101722;
+            border: 1px solid #26394f;
+            border-radius: 14px;
+            padding: 15px;
+        }
+
+        .row {
+            display: flex;
+            justify-content: space-between;
+            padding: 7px 0;
+            border-bottom: 1px solid #243244;
+        }
+
+        .ok {
+            color: #39ff88;
+        }
+
+        .bad {
+            color: #ff4d4d;
+        }
+
+        .warn {
+            color: #ffd447;
+        }
+
+        a {
+            color: #6ab7ff;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="top">
+    <h1>Agrobot A1 - Radar LIDAR Live</h1>
+    <div>
+        <a href="/">Înapoi la dashboard</a>
+    </div>
+</div>
+
+<div class="wrap">
+    <div class="radar-box">
+        <canvas id="radar" width="700" height="700"></canvas>
+    </div>
+
+    <div class="panel">
+        <h2>Scanner LIDAR</h2>
+
+        <div class="row">
+            <span>Stare</span>
+            <b id="connected">--</b>
+        </div>
+
+        <div class="row">
+            <span>Port</span>
+            <b id="port">--</b>
+        </div>
+
+        <div class="row">
+            <span>Puncte</span>
+            <b id="points">--</b>
+        </div>
+
+        <div class="row">
+            <span>Actualizat</span>
+            <b id="updated">--</b>
+        </div>
+
+        <div class="row">
+            <span>Eroare</span>
+            <b id="error">--</b>
+        </div>
+
+        <h3>Distanțe</h3>
+
+        <div class="row">
+            <span>Față</span>
+            <b id="front">-- mm</b>
+        </div>
+
+        <div class="row">
+            <span>Stânga</span>
+            <b id="left">-- mm</b>
+        </div>
+
+        <div class="row">
+            <span>Dreapta</span>
+            <b id="right">-- mm</b>
+        </div>
+
+        <h3>Obstacole</h3>
+
+        <div class="row">
+            <span>Față</span>
+            <b id="obsFront">--</b>
+        </div>
+
+        <div class="row">
+            <span>Stânga</span>
+            <b id="obsLeft">--</b>
+        </div>
+
+        <div class="row">
+            <span>Dreapta</span>
+            <b id="obsRight">--</b>
+        </div>
+
+        <p style="font-size:13px;color:#aaa;">
+            Puncte verzi = departe, galbene = aproape, roșii = obstacol.
+            Fața robotului este sus.
+        </p>
+    </div>
+</div>
+
+<script>
+const canvas = document.getElementById("radar");
+const ctx = canvas.getContext("2d");
+
+const W = canvas.width;
+const H = canvas.height;
+
+const CX = W / 2;
+const CY = H / 2;
+
+const MAX_MM = 6000;
+const RADIUS = 320;
+
+let sweepAngle = 0;
+
+function drawRadar(data) {
+    ctx.clearRect(0, 0, W, H);
+
+    ctx.fillStyle = "#020509";
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.strokeStyle = "#14324a";
+    ctx.lineWidth = 1;
+
+    for (let r = 80; r <= RADIUS; r += 80) {
+        ctx.beginPath();
+        ctx.arc(CX, CY, r, 0, Math.PI * 2);
+        ctx.stroke();
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(CX, CY - RADIUS);
+    ctx.lineTo(CX, CY + RADIUS);
+    ctx.moveTo(CX - RADIUS, CY);
+    ctx.lineTo(CX + RADIUS, CY);
+    ctx.stroke();
+
+    ctx.fillStyle = "#5fa8d3";
+    ctx.font = "13px Arial";
+    ctx.fillText("Față", CX - 15, CY - RADIUS - 10);
+    ctx.fillText("Spate", CX - 18, CY + RADIUS + 22);
+    ctx.fillText("Stânga", CX - RADIUS - 50, CY + 4);
+    ctx.fillText("Dreapta", CX + RADIUS + 10, CY + 4);
+
+    if (data.points) {
+        for (const p of data.points) {
+            const angleDeg = p.angle;
+            const distance = p.distance;
+
+            if (!distance || distance <= 0) {
+                continue;
+            }
+
+            const distRatio = Math.min(distance / MAX_MM, 1);
+            const r = distRatio * RADIUS;
+
+            const rad = (angleDeg - 90) * Math.PI / 180;
+
+            const x = CX + Math.cos(rad) * r;
+            const y = CY + Math.sin(rad) * r;
+
+            ctx.beginPath();
+
+            if (distance <= 600) {
+                ctx.fillStyle = "#ff3b3b";
+                ctx.arc(x, y, 4, 0, Math.PI * 2);
+            } else if (distance <= 1200) {
+                ctx.fillStyle = "#ffd447";
+                ctx.arc(x, y, 3, 0, Math.PI * 2);
+            } else {
+                ctx.fillStyle = "#39ff88";
+                ctx.arc(x, y, 2, 0, Math.PI * 2);
+            }
+
+            ctx.fill();
+        }
+    }
+
+    sweepAngle += 4;
+
+    if (sweepAngle >= 360) {
+        sweepAngle = 0;
+    }
+
+    const sweepRad = (sweepAngle - 90) * Math.PI / 180;
+
+    ctx.strokeStyle = "rgba(57, 255, 136, 0.8)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(CX, CY);
+    ctx.lineTo(
+        CX + Math.cos(sweepRad) * RADIUS,
+        CY + Math.sin(sweepRad) * RADIUS
+    );
+    ctx.stroke();
+
+    ctx.fillStyle = "#6ab7ff";
+    ctx.beginPath();
+    ctx.arc(CX, CY, 7, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.moveTo(CX, CY - 18);
+    ctx.lineTo(CX - 9, CY + 8);
+    ctx.lineTo(CX + 9, CY + 8);
+    ctx.closePath();
+    ctx.fill();
+}
+
+function setText(id, value) {
+    document.getElementById(id).textContent = value;
+}
+
+function setObstacle(id, value) {
+    const el = document.getElementById(id);
+    el.textContent = value ? "DA" : "NU";
+    el.className = value ? "bad" : "ok";
+}
+
+async function update() {
+    try {
+        const res = await fetch("/api/lidar");
+        const data = await res.json();
+
+        const connected = document.getElementById("connected");
+
+        connected.textContent = data.connected ? "Conectat" : "Nu este conectat";
+        connected.className = data.connected ? "ok" : "bad";
+
+        setText("port", data.port || "--");
+        setText("points", data.points_count ?? "--");
+        setText("updated", data.last_update || "--");
+        setText("error", data.error || "--");
+
+        setText("front", data.min_front_mm ? data.min_front_mm + " mm" : "-- mm");
+        setText("left", data.min_left_mm ? data.min_left_mm + " mm" : "-- mm");
+        setText("right", data.min_right_mm ? data.min_right_mm + " mm" : "-- mm");
+
+        setObstacle("obsFront", data.obstacle_front);
+        setObstacle("obsLeft", data.obstacle_left);
+        setObstacle("obsRight", data.obstacle_right);
+
+        drawRadar(data);
+
+    } catch (e) {
+        console.log(e);
+    }
+}
+
+setInterval(update, 150);
+update();
+</script>
+
+</body>
+</html>
