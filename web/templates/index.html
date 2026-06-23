@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <title>Agrobot A1 Dashboard</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #0b0f17;
+            color: white;
+        }
+
+        header {
+            padding: 25px;
+            background: linear-gradient(90deg, #111827, #0f766e);
+            text-align: center;
+            box-shadow: 0 4px 20px #000;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 36px;
+        }
+
+        header p {
+            margin-top: 8px;
+            color: #d1d5db;
+        }
+
+        .status-pill {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            background: #374151;
+            margin-top: 8px;
+        }
+
+        .ok {
+            background: #064e3b;
+            color: #34d399;
+        }
+
+        .bad {
+            background: #7f1d1d;
+            color: #fca5a5;
+        }
+
+        .warn {
+            background: #78350f;
+            color: #fde68a;
+        }
+
+        .dashboard {
+            padding: 25px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: #111827;
+            border: 1px solid #1f2937;
+            border-radius: 20px;
+            padding: 22px;
+            box-shadow: 0 0 25px rgba(0, 0, 0, 0.35);
+        }
+
+        .card h2 {
+            margin-top: 0;
+            color: #38bdf8;
+            font-size: 22px;
+            border-bottom: 1px solid #334155;
+            padding-bottom: 10px;
+        }
+
+        .big {
+            font-size: 50px;
+            font-weight: bold;
+            margin: 15px 0;
+        }
+
+        .green {
+            color: #22c55e;
+        }
+
+        .yellow {
+            color: #facc15;
+        }
+
+        .red {
+            color: #ef4444;
+        }
+
+        .blue {
+            color: #38bdf8;
+        }
+
+        .row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #1f2937;
+            gap: 12px;
+        }
+
+        .row span:first-child {
+            color: #9ca3af;
+        }
+
+        .row span:last-child {
+            font-weight: bold;
+            text-align: right;
+        }
+
+        .battery-bar {
+            width: 100%;
+            height: 28px;
+            background: #374151;
+            border-radius: 30px;
+            overflow: hidden;
+            margin-top: 15px;
+            margin-bottom: 15px;
+        }
+
+        .battery-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #ef4444, #facc15, #22c55e);
+            transition: width 0.4s;
+        }
+
+        canvas {
+            width: 100%;
+            height: 230px;
+            background: #020617;
+            border-radius: 15px;
+            margin-top: 18px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            font-size: 14px;
+        }
+
+        th, td {
+            padding: 8px;
+            border-bottom: 1px solid #334155;
+            text-align: center;
+        }
+
+        th {
+            color: #38bdf8;
+        }
+
+        #map {
+            height: 420px;
+            border-radius: 18px;
+            overflow: hidden;
+            margin-top: 15px;
+        }
+
+        .wide {
+            grid-column: span 2;
+        }
+
+        .mode-switch {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 15px;
+            margin-bottom: 12px;
+        }
+
+        .mode-switch button {
+            border: none;
+            border-radius: 15px;
+            padding: 14px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            background: #374151;
+            transition: 0.2s;
+        }
+
+        .mode-switch button.active-web {
+            background: #16a34a;
+        }
+
+        .mode-switch button.active-rc {
+            background: #2563eb;
+        }
+
+        .joystick-wrap {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+            margin-bottom: 15px;
+        }
+
+        .joystick-base {
+            position: relative;
+            width: 290px;
+            height: 290px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #1e293b 0%, #0f172a 65%, #020617 100%);
+            border: 3px solid #334155;
+            box-shadow: inset 0 0 25px rgba(0,0,0,0.6), 0 0 25px rgba(0,0,0,0.4);
+            touch-action: none;
+            user-select: none;
+        }
+
+        .joystick-cross-v {
+            position: absolute;
+            left: 50%;
+            top: 15px;
+            width: 2px;
+            height: 260px;
+            background: #334155;
+            transform: translateX(-50%);
+        }
+
+        .joystick-cross-h {
+            position: absolute;
+            top: 50%;
+            left: 15px;
+            width: 260px;
+            height: 2px;
+            background: #334155;
+            transform: translateY(-50%);
+        }
+
+        .joystick-dir {
+            position: absolute;
+            color: #64748b;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .dir-up {
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .dir-down {
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .dir-left {
+            top: 50%;
+            left: 10px;
+            transform: translateY(-50%);
+        }
+
+        .dir-right {
+            top: 50%;
+            right: 10px;
+            transform: translateY(-50%);
+        }
+
+        .joystick-knob {
+            position: absolute;
+            width: 86px;
+            height: 86px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #60a5fa, #1d4ed8);
+            border: 3px solid #93c5fd;
+            box-shadow: 0 8px 0 #1e3a8a, 0 0 18px rgba(59,130,246,0.6);
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            cursor: grab;
+            touch-action: none;
+        }
+
+        .joystick-knob:active {
+            cursor: grabbing;
+            box-shadow: 0 3px 0 #1e3a8a, 0 0 20px rgba(59,130,246,0.9);
+        }
+
+        .joystick-label {
+            text-align: center;
+            color: #93c5fd;
+            font-weight: bold;
+            margin-top: 8px;
+        }
+
+        .rc-info-box {
+            margin-top: 18px;
+            background: #020617;
+            border: 1px solid #334155;
+            border-radius: 15px;
+            padding: 15px;
+        }
+
+        .rc-info-title {
+            color: #38bdf8;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .signal-big {
+            font-size: 30px;
+            font-weight: bold;
+            color: #22c55e;
+            text-align: center;
+            margin: 10px 0;
+        }
+
+        .motor-box {
+            margin-top: 18px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .motor {
+            background: #020617;
+            border-radius: 15px;
+            padding: 15px;
+            text-align: center;
+            border: 1px solid #334155;
+        }
+
+        .motor .value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #22c55e;
+        }
+
+        .terminal {
+            margin-top: 15px;
+            background: #020617;
+            color: #22c55e;
+            border: 1px solid #334155;
+            border-radius: 14px;
+            padding: 14px;
+            font-family: monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+            overflow-x: auto;
+        }
+
+        .control-note {
+            margin-top: 12px;
+            color: #facc15;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        footer {
+            text-align: center;
+            padding: 20px;
+            color: #9ca3af;
+        }
+
+        @media (max-width: 900px) {
+            .wide {
+                grid-column: span 1;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <h1>Agrobot A1</h1>
+    <p>Dashboard live pentru robot/mașină</p>
+    <div id="mainStatus" class="status-pill warn">Se conectează...</div>
+</header>
+
+<div class="dashboard">
+
+    <div class="card wide">
+        <h2>1. Baterie + grafic + tabel</h2>
+
+        <div class="big green" id="batteryPercent">--%</div>
+
+        <div class="battery-bar">
+            <div class="battery-fill" id="batteryFill"></div>
+        </div>
+
+        <div class="row">
+            <span>Tensiune</span>
+            <span id="batteryVoltage">-- V</span>
+        </div>
+
+        <div class="row">
+            <span>Capacitate</span>
+            <span id="batteryCapacity">-- mAh</span>
+        </div>
+
+        <div class="row">
+            <span>Prag baterie joasă</span>
+            <span id="batteryLow">-- V</span>
+        </div>
+
+        <div class="row">
+            <span>Actualizat</span>
+            <span id="updated">--</span>
+        </div>
+
+        <canvas id="voltageChart" width="1000" height="260"></canvas>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Minutul</th>
+                    <th>Tensiune</th>
+                    <th>Procent</th>
+                </tr>
+            </thead>
+            <tbody id="batteryTable">
+                <tr>
+                    <td>--</td>
+                    <td>-- V</td>
+                    <td>-- %</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card wide">
+        <h2>2. GPS + hartă live</h2>
+
+        <div class="row">
+            <span>Sateliți</span>
+            <span id="satellites">--</span>
+        </div>
+
+        <div class="row">
+            <span>Fix GPS</span>
+            <span id="gpsFix">--</span>
+        </div>
+
+        <div class="row">
+            <span>Latitudine</span>
+            <span id="lat">--</span>
+        </div>
+
+        <div class="row">
+            <span>Longitudine</span>
+            <span id="lon">--</span>
+        </div>
+
+        <div class="row">
+            <span>Altitudine relativă</span>
+            <span id="relAlt">-- m</span>
+        </div>
+
+        <div id="map"></div>
+    </div>
+
+    <div class="card">
+        <h2>3. Mișcare</h2>
+
+        <div class="big blue" id="speed">-- km/h</div>
+
+        <div class="row">
+            <span>Viteză m/s</span>
+            <span id="speedMs">-- m/s</span>
+        </div>
+
+        <div class="row">
+            <span>Heading</span>
+            <span id="heading">--°</span>
+        </div>
+
+        <div class="row">
+            <span>Roll</span>
+            <span id="roll">--°</span>
+        </div>
+
+        <div class="row">
+            <span>Pitch</span>
+            <span id="pitch">--°</span>
+        </div>
+
+        <div class="row">
+            <span>Yaw</span>
+            <span id="yaw">--°</span>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>4. Misiune</h2>
+
+        <div class="row">
+            <span>Număr waypoint-uri</span>
+            <span id="wpCount">--</span>
+        </div>
+
+        <div class="row">
+            <span>Waypoint curent</span>
+            <span id="wpCurrent">--</span>
+        </div>
+
+        <div class="row">
+            <span>Viteză waypoint</span>
+            <span id="wpSpeed">-- m/s</span>
+        </div>
+
+        <div class="row">
+            <span>Distanță până la următorul punct</span>
+            <span id="wpDistance">-- m</span>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>5. Siguranță</h2>
+
+        <div class="row">
+            <span>Telecomandă externă</span>
+            <span id="rcStatus">--</span>
+        </div>
+
+        <div class="row">
+            <span>Semnal telecomandă</span>
+            <span id="rcSignal">-- %</span>
+        </div>
+
+        <div class="row">
+            <span>Armat</span>
+            <span id="armed">--</span>
+        </div>
+
+        <div class="row">
+            <span>GPS OK</span>
+            <span id="gpsOk">--</span>
+        </div>
+
+        <div class="row">
+            <span>Baterie OK</span>
+            <span id="batteryOk">--</span>
+        </div>
+
+        <div class="row">
+            <span>Eroare</span>
+            <span id="errorText">--</span>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>6. Control mașină</h2>
+
+        <div class="mode-switch">
+            <button id="webModeBtn" onclick="setControlMode('web')">WEB</button>
+            <button id="rcModeBtn" onclick="setControlMode('rc')">TELECOMANDĂ</button>
+        </div>
+
+        <div class="row">
+            <span>Mod control</span>
+            <span id="controlMode">--</span>
+        </div>
+
+        <div class="joystick-wrap">
+            <div class="joystick-base" id="joystickBase">
+                <div class="joystick-cross-v"></div>
+                <div class="joystick-cross-h"></div>
+
+                <div class="joystick-dir dir-up">ÎNAINTE</div>
+                <div class="joystick-dir dir-down">ÎNAPOI</div>
+                <div class="joystick-dir dir-left">STÂNGA</div>
+                <div class="joystick-dir dir-right">DREAPTA</div>
+
+                <div class="joystick-knob" id="joystickKnob"></div>
+            </div>
+        </div>
+
+        <div class="joystick-label" id="joystickText">
+            Joystick: throttle 0.00 / steering 0.00
+        </div>
+
+        <div class="rc-info-box">
+            <div class="rc-info-title">Semnal primit de la telecomandă</div>
+
+            <div class="signal-big" id="rcSignalRemote">-- %</div>
+
+            <div class="row">
+                <span>Telecomandă conectată</span>
+                <span id="rcStatusRemote">--</span>
+            </div>
+
+            <div class="row">
+                <span>Robot armat</span>
+                <span id="armedRemote">--</span>
+            </div>
+        </div>
+
+        <div class="motor-box">
+            <div class="motor">
+                <div>Motor spate</div>
+                <div>înainte / înapoi</div>
+                <div class="value" id="rearMotor">0</div>
+            </div>
+
+            <div class="motor">
+                <div>Servo față</div>
+                <div>stânga / dreapta</div>
+                <div class="value" id="frontServo">0</div>
+            </div>
+        </div>
+
+        <div class="row">
+            <span>Comandă web</span>
+            <span id="controlCommand">stop</span>
+        </div>
+
+        <div class="row">
+            <span>Throttle analog</span>
+            <span id="analogThrottle">0.00</span>
+        </div>
+
+        <div class="row">
+            <span>Steering analog</span>
+            <span id="analogSteering">0.00</span>
+        </div>
+
+        <div class="row">
+            <span>Throttle PWM CH3</span>
+            <span id="throttlePwm">1500</span>
+        </div>
+
+        <div class="row">
+            <span>Steering PWM CH1</span>
+            <span id="steeringPwm">1500</span>
+        </div>
+
+        <div class="row">
+            <span>Eroare control</span>
+            <span id="controlError">--</span>
+        </div>
+
+        <pre class="terminal" id="rcTerminal">Aștept semnal RC...</pre>
+
+        <div class="control-note">
+            Alege WEB. Trage punctul în sus pentru înainte. Trage dreapta-sus pentru înainte + dreapta.
+        </div>
+    </div>
+
+</div>
+
+<footer>
+    Agrobot A1 — monitorizare live prin MAVLink
+</footer>
+
+<script>
+    let map = L.map("map").setView([47.0105, 28.8638], 15);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19
+    }).addTo(map);
+
+    let robotMarker = L.marker([47.0105, 28.8638]).addTo(map);
+    robotMarker.bindPopup("Agrobot A1");
+
+    let firstGps = true;
+    let joystickActive = false;
+    let lastJoystickSend = 0;
+
+    function safeObj(obj) {
+        return obj || {};
+    }
+
+    function val(value, decimals = 2) {
+        if (value === null || value === undefined || Number.isNaN(Number(value))) {
+            return "--";
+        }
+
+        return Number(value).toFixed(decimals);
+    }
+
+    function boolText(value) {
+        if (value === true) return "DA";
+        if (value === false) return "NU";
+        return "--";
+    }
+
+    function setText(id, text) {
+        const el = document.getElementById(id);
+
+        if (el) {
+            el.innerText = text;
+        }
+    }
+
+    function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
+    async function setControlMode(mode) {
+        try {
+            await fetch("/api/control_mode", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    mode: mode
+                })
+            });
+        } catch (error) {
+            console.log("Eroare mode:", error);
+        }
+    }
+
+    async function sendAnalogControl(throttle, steering) {
+        try {
+            await fetch("/api/control_analog", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    throttle: throttle,
+                    steering: steering
+                })
+            });
+        } catch (error) {
+            console.log("Eroare joystick:", error);
+        }
+    }
+
+    async function sendControl(command) {
+        try {
+            await fetch("/api/control", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    command: command
+                })
+            });
+        } catch (error) {
+            console.log("Eroare control:", error);
+        }
+    }
+
+    function resetJoystick() {
+        const knob = document.getElementById("joystickKnob");
+
+        if (knob) {
+            knob.style.left = "50%";
+            knob.style.top = "50%";
+            knob.style.transform = "translate(-50%, -50%)";
+        }
+
+        setText("joystickText", "Joystick: throttle 0.00 / steering 0.00");
+        sendAnalogControl(0, 0);
+    }
+
+    function updateJoystickFromEvent(event) {
+        const base = document.getElementById("joystickBase");
+        const knob = document.getElementById("joystickKnob");
+
+        if (!base || !knob) {
+            return;
+        }
+
+        let clientX;
+        let clientY;
+
+        if (event.touches && event.touches.length > 0) {
+            clientX = event.touches[0].clientX;
+            clientY = event.touches[0].clientY;
+        } else {
+            clientX = event.clientX;
+            clientY = event.clientY;
+        }
+
+        const rect = base.getBoundingClientRect();
+
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+
+        let dx = clientX - centerX;
+        let dy = clientY - centerY;
+
+        const radius = rect.width / 2 - 48;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance > radius) {
+            dx = dx / distance * radius;
+            dy = dy / distance * radius;
+        }
+
+        const knobX = rect.width / 2 + dx;
+        const knobY = rect.height / 2 + dy;
+
+        knob.style.left = knobX + "px";
+        knob.style.top = knobY + "px";
+        knob.style.transform = "translate(-50%, -50%)";
+
+        let steering = dx / radius;
+        let throttle = -dy / radius;
+
+        steering = clamp(steering, -1, 1);
+        throttle = clamp(throttle, -1, 1);
+
+        if (Math.abs(steering) < 0.05) steering = 0;
+        if (Math.abs(throttle) < 0.05) throttle = 0;
+
+        setText(
+            "joystickText",
+            "Joystick: throttle " + throttle.toFixed(2) + " / steering " + steering.toFixed(2)
+        );
+
+        const nowMs = Date.now();
+
+        if (nowMs - lastJoystickSend > 50) {
+            lastJoystickSend = nowMs;
+            sendAnalogControl(throttle, steering);
+        }
+    }
+
+    function setupJoystick() {
+        const base = document.getElementById("joystickBase");
+
+        if (!base) {
+            return;
+        }
+
+        base.addEventListener("mousedown", function(event) {
+            joystickActive = true;
+            updateJoystickFromEvent(event);
+        });
+
+        document.addEventListener("mousemove", function(event) {
+            if (joystickActive) {
+                updateJoystickFromEvent(event);
+            }
+        });
+
+        document.addEventListener("mouseup", function() {
+            if (joystickActive) {
+                joystickActive = false;
+                resetJoystick();
+            }
+        });
+
+        base.addEventListener("touchstart", function(event) {
+            joystickActive = true;
+            updateJoystickFromEvent(event);
+            event.preventDefault();
+        }, { passive: false });
+
+        document.addEventListener("touchmove", function(event) {
+            if (joystickActive) {
+                updateJoystickFromEvent(event);
+                event.preventDefault();
+            }
+        }, { passive: false });
+
+        document.addEventListener("touchend", function() {
+            if (joystickActive) {
+                joystickActive = false;
+                resetJoystick();
+            }
+        });
+    }
+
+    function drawVoltageChart(history) {
+        const canvas = document.getElementById("voltageChart");
+
+        if (!canvas) {
+            return;
+        }
+
+        const ctx = canvas.getContext("2d");
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        ctx.fillStyle = "#020617";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        if (!Array.isArray(history) || history.length < 2) {
+            ctx.fillStyle = "#9ca3af";
+            ctx.font = "22px Arial";
+            ctx.fillText("Graficul va apărea după cel puțin 2 minute de date", 30, 130);
+            return;
+        }
+
+        const padding = 45;
+
+        const values = history
+            .map(x => Number(x.voltage_v))
+            .filter(x => !Number.isNaN(x));
+
+        if (values.length < 2) {
+            return;
+        }
+
+        const minV = Math.min(...values) - 0.2;
+        const maxV = Math.max(...values) + 0.2;
+
+        ctx.strokeStyle = "#334155";
+        ctx.lineWidth = 1;
+
+        for (let i = 0; i <= 5; i++) {
+            let y = padding + i * ((canvas.height - padding * 2) / 5);
+
+            ctx.beginPath();
+            ctx.moveTo(padding, y);
+            ctx.lineTo(canvas.width - padding, y);
+            ctx.stroke();
+
+            let labelValue = maxV - i * ((maxV - minV) / 5);
+
+            ctx.fillStyle = "#9ca3af";
+            ctx.font = "14px Arial";
+            ctx.fillText(labelValue.toFixed(2) + " V", 5, y + 5);
+        }
+
+        ctx.strokeStyle = "#22c55e";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+
+        history.forEach((item, index) => {
+            let voltage = Number(item.voltage_v);
+
+            if (Number.isNaN(voltage)) {
+                return;
+            }
+
+            let x = padding + index * ((canvas.width - padding * 2) / (history.length - 1));
+            let y = canvas.height - padding - ((voltage - minV) / (maxV - minV)) * (canvas.height - padding * 2);
+
+            if (index === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        });
+
+        ctx.stroke();
+
+        ctx.fillStyle = "#e5e7eb";
+        ctx.font = "16px Arial";
+        ctx.fillText("Tensiune baterie — o valoare pe minut", padding, 25);
+    }
+
+    function updateBatteryTable(history) {
+        const tbody = document.getElementById("batteryTable");
+
+        if (!tbody) {
+            return;
+        }
+
+        tbody.innerHTML = "";
+
+        if (!Array.isArray(history) || history.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td>--</td>
+                    <td>-- V</td>
+                    <td>-- %</td>
+                </tr>
+            `;
+            return;
+        }
+
+        history.slice(-15).reverse().forEach(item => {
+            let row = document.createElement("tr");
+
+            row.innerHTML = `
+                <td>${item.time || "--"}</td>
+                <td>${item.voltage_v ?? "--"} V</td>
+                <td>${item.percent === null || item.percent === undefined ? "--" : item.percent + " %"}</td>
+            `;
+
+            tbody.appendChild(row);
+        });
+    }
+
+    function updateMap(gps) {
+        if (!gps) {
+            return;
+        }
+
+        if (gps.lat === null || gps.lon === null || gps.lat === undefined || gps.lon === undefined) {
+            return;
+        }
+
+        let lat = Number(gps.lat);
+        let lon = Number(gps.lon);
+
+        if (Number.isNaN(lat) || Number.isNaN(lon)) {
+            return;
+        }
+
+        if (lat === 0 && lon === 0) {
+            return;
+        }
+
+        robotMarker.setLatLng([lat, lon]);
+        robotMarker.setPopupContent(
+            "Agrobot A1<br>Lat: " + lat.toFixed(7) + "<br>Lon: " + lon.toFixed(7)
+        );
+
+        if (firstGps) {
+            map.setView([lat, lon], 18);
+            firstGps = false;
+        }
+    }
+
+    function updateRcTerminal(rcRaw) {
+        const channels = safeObj(rcRaw.channels);
+
+        const text =
+`RC_CHANNELS
+RSSI: ${rcRaw.rssi ?? "--"}
+SIGNAL: ${rcRaw.signal_percent ?? "--"} %
+LAST: ${rcRaw.last_update ?? "--"}
+
+CH1 Steering: ${channels.ch1 ?? "--"}
+CH2:          ${channels.ch2 ?? "--"}
+CH3 Throttle: ${channels.ch3 ?? "--"}
+CH4:          ${channels.ch4 ?? "--"}
+CH5:          ${channels.ch5 ?? "--"}
+CH6:          ${channels.ch6 ?? "--"}
+CH7:          ${channels.ch7 ?? "--"}
+CH8:          ${channels.ch8 ?? "--"}
+CH9:          ${channels.ch9 ?? "--"}
+CH10:         ${channels.ch10 ?? "--"}
+CH11:         ${channels.ch11 ?? "--"}
+CH12:         ${channels.ch12 ?? "--"}`;
+
+        setText("rcTerminal", text);
+    }
+
+    async function updateDashboard() {
+        try {
+            const response = await fetch("/api/robot");
+
+            if (!response.ok) {
+                throw new Error("HTTP " + response.status);
+            }
+
+            const data = await response.json();
+
+            const battery = safeObj(data.battery);
+            const gps = safeObj(data.gps);
+            const movement = safeObj(data.movement);
+            const mission = safeObj(data.mission);
+            const safety = safeObj(data.safety);
+            const control = safeObj(data.control);
+            const rcRaw = safeObj(data.rc_raw);
+
+            if (data.connected === true) {
+                setText("mainStatus", "Conectat la robot");
+                document.getElementById("mainStatus").className = "status-pill ok";
+            } else {
+                setText("mainStatus", "Nu este conectat la robot");
+                document.getElementById("mainStatus").className = "status-pill bad";
+            }
+
+            if (battery.remaining_percent !== null && battery.remaining_percent !== undefined) {
+                let percent = Math.round(Number(battery.remaining_percent));
+
+                if (Number.isNaN(percent)) percent = 0;
+                if (percent > 100) percent = 100;
+                if (percent < 0) percent = 0;
+
+                setText("batteryPercent", percent + "%");
+                document.getElementById("batteryFill").style.width = percent + "%";
+
+                if (percent > 50) {
+                    document.getElementById("batteryPercent").className = "big green";
+                } else if (percent > 25) {
+                    document.getElementById("batteryPercent").className = "big yellow";
+                } else {
+                    document.getElementById("batteryPercent").className = "big red";
+                }
+            } else {
+                setText("batteryPercent", "--%");
+                document.getElementById("batteryFill").style.width = "0%";
+            }
+
+            setText("batteryVoltage", val(battery.voltage_v, 2) + " V");
+            setText("batteryCapacity", battery.capacity_mah === null || battery.capacity_mah === undefined ? "-- mAh" : battery.capacity_mah + " mAh");
+            setText("batteryLow", val(battery.low_voltage, 2) + " V");
+
+            if (data.updated !== null && data.updated !== undefined) {
+                let date = new Date(data.updated * 1000);
+                setText("updated", date.toLocaleTimeString());
+            } else {
+                setText("updated", "--");
+            }
+
+            setText("satellites", gps.satellites ?? "--");
+            setText("gpsFix", gps.fix_type ?? "--");
+
+            if (gps.lat === null || gps.lat === undefined) {
+                setText("lat", "--");
+            } else {
+                setText("lat", Number(gps.lat).toFixed(7));
+            }
+
+            if (gps.lon === null || gps.lon === undefined) {
+                setText("lon", "--");
+            } else {
+                setText("lon", Number(gps.lon).toFixed(7));
+            }
+
+            setText("relAlt", val(gps.rel_alt_m, 2) + " m");
+
+            setText("speed", val(movement.speed_km_h, 2) + " km/h");
+            setText("speedMs", val(movement.speed_m_s, 2) + " m/s");
+            setText("heading", val(movement.heading_deg, 1) + "°");
+            setText("roll", val(movement.roll_deg, 1) + "°");
+            setText("pitch", val(movement.pitch_deg, 1) + "°");
+            setText("yaw", val(movement.yaw_deg, 1) + "°");
+
+            setText("wpCount", mission.waypoint_count ?? "--");
+            setText("wpCurrent", mission.current_waypoint ?? "--");
+            setText("wpSpeed", val(mission.wp_speed, 2) + " m/s");
+            setText("wpDistance", val(mission.distance_to_next_m, 1) + " m");
+
+            setText("rcStatus", boolText(safety.rc_available));
+
+            if (
+                safety.rc_signal_percent !== null &&
+                safety.rc_signal_percent !== undefined &&
+                !Number.isNaN(Number(safety.rc_signal_percent))
+            ) {
+                let rcPercent = Number(safety.rc_signal_percent);
+
+                if (rcPercent > 100) rcPercent = 100;
+                if (rcPercent < 0) rcPercent = 0;
+
+                setText("rcSignal", Math.round(rcPercent) + " %");
+                setText("rcSignalRemote", Math.round(rcPercent) + " %");
+            } else {
+                setText("rcSignal", "-- %");
+                setText("rcSignalRemote", "-- %");
+            }
+
+            setText("armed", boolText(safety.armed));
+            setText("gpsOk", boolText(safety.gps_ok));
+            setText("batteryOk", boolText(safety.battery_ok));
+            setText("errorText", data.error ?? "--");
+
+            setText("rcStatusRemote", boolText(safety.rc_available));
+            setText("armedRemote", boolText(safety.armed));
+
+            setText("rearMotor", control.rear_motor ?? 0);
+            setText("frontServo", control.front_servo ?? 0);
+            setText("controlCommand", control.command ?? "stop");
+            setText("controlMode", control.mode ?? "--");
+            setText("analogThrottle", control.analog_throttle ?? "0.00");
+            setText("analogSteering", control.analog_steering ?? "0.00");
+            setText("throttlePwm", control.throttle_pwm ?? 1500);
+            setText("steeringPwm", control.steering_pwm ?? 1500);
+            setText("controlError", control.manual_error ?? "--");
+
+            const webBtn = document.getElementById("webModeBtn");
+            const rcBtn = document.getElementById("rcModeBtn");
+
+            if (webBtn && rcBtn) {
+                if (control.mode === "web") {
+                    webBtn.className = "active-web";
+                    rcBtn.className = "";
+                } else {
+                    webBtn.className = "";
+                    rcBtn.className = "active-rc";
+                }
+            }
+
+            updateRcTerminal(rcRaw);
+            updateMap(gps);
+            drawVoltageChart(battery.history || []);
+            updateBatteryTable(battery.history || []);
+
+        } catch (error) {
+            console.log("Eroare dashboard:", error);
+            setText("mainStatus", "Eroare JS/API: " + error.message);
+            document.getElementById("mainStatus").className = "status-pill bad";
+        }
+    }
+
+    setupJoystick();
+
+    setInterval(updateDashboard, 1000);
+    updateDashboard();
+</script>
+
+</body>
+</html>
